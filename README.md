@@ -1,2 +1,1 @@
-# check it out
-![preview](https://cdn.discordapp.com/attachments/1177608503309906042/1177620761989632101/c2LrBDI.png)
+This fork is just tweaked to scale the hud with the screen and slightly improve AR/FOV while avoiding being cheat-ey. Could definitely be improved but it's good enough and I'm lazy.
