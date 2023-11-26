@@ -8,31 +8,29 @@ namespace LethalWidescreen.Patches
     [HarmonyPatch(typeof(PlayerControllerB))]
     internal class PlayerControllerBPatch
     {
+       
         [HarmonyPostfix]
         [HarmonyPatch("OnEnable")]
-        private static void OnEnable(PlayerControllerB __instance)
+        private static void PostfixOnEnable(PlayerControllerB __instance)
         {
-            GameObject ingamePlayerHud = GameObject.Find("Panel");
+            var aspect = (float)Screen.width / Screen.height;
+            RectTransform component = GameObject.Find("Panel").GetComponent<RectTransform>();
+            component.anchorMin = new Vector2(0f, 0f);
+            component.anchorMax = new Vector2(1f, 1f);
+            component.anchoredPosition = Vector2.zero;
+            component.sizeDelta = Vector2.zero;
+            ManualLogSource mls = CWidescreen.mls;
+            float num = ((float)Screen.width / ((float)Screen.height * 1.7777778f));
+            mls.LogInfo((object)("!!! " + num + " set to xScaleFactor!"));
+            ((Transform)component).localScale = new Vector3(num + 0.1f, 1f, 1f);
 
-            RectTransform panelRectTransform = ingamePlayerHud.GetComponent<RectTransform>();
-
-            panelRectTransform.anchorMin = new Vector2(0, 0);
-            panelRectTransform.anchorMax = new Vector2(1, 1);
-            panelRectTransform.anchoredPosition = Vector2.zero;
-            panelRectTransform.sizeDelta = Vector2.zero;
-
-            float xScaleFactor = Screen.width / (Screen.height * (16f / 9f));
-            panelRectTransform.localScale = new Vector3(xScaleFactor + 0.1f, 1f, 1f);
-
-            ManualLogSource mls = LethalWidescreen.mls;
-            mls.LogInfo("!!! " + xScaleFactor + " set to xScaleFactor!");
 
             //Scale the hud
             UnityEngine.UI.AspectRatioFitter uiArf = __instance.playerHudUIContainer.GetComponent<AspectRatioFitter>();
-            uiArf.aspectRatio = (float)Screen.width / Screen.height;
+            uiArf.aspectRatio = aspect;
 
             CanvasScaler uiScaler = __instance.playerHudUIContainer.parent.GetComponent<CanvasScaler>();
-            uiScaler.scaleFactor = (float)Screen.width / Screen.height; //Approx aspect ratio seems to work for canvas scaling. Maybe coincidence.
+            uiScaler.scaleFactor = aspect; //Approx aspect ratio seems to work for canvas scaling. Maybe coincidence.
             uiScaler.uiScaleMode = CanvasScaler.ScaleMode.ConstantPixelSize;
 
             //Recenter Inventory Grid for 21:9
@@ -40,16 +38,46 @@ namespace LethalWidescreen.Patches
             inventory.anchorMax = new Vector2(0.0f, 1.0f);
             inventory.anchorMin = new Vector2(1.04f, 0.1f);
 
-            //sliiightly bump camera aspect
-            __instance.gameplayCamera.aspect = 1.78f; //Slightly increase the aspect ratio. Actual 21:9 would be cheat-ey. Adds a few degrees of vision on either side to combat stretching further.
+            //Aspect and FOV are now mostly correct.
+            __instance.gameplayCamera.aspect = aspect;
+
+        }
+
+        static float lastActualFov = 60f;
+
+        [HarmonyPrefix]
+        [HarmonyPatch("Update")]
+        private static void PrefixUpdate(PlayerControllerB __instance)
+        {
+            lastActualFov = __instance.gameplayCamera.fieldOfView;
         }
 
         [HarmonyPostfix]
         [HarmonyPatch("Update")]
-        private static void LateUpdate(PlayerControllerB __instance)
+        private static void PostfixUpdate(PlayerControllerB __instance)
         {
-            Camera camera = __instance.gameplayCamera;
-            __instance.targetFOV = camera.fieldOfView * 1.25f;
+            float newTarget = 60f;
+            var scavHelmet = GameObject.Find("ScavengerHelmet").GetComponent<Transform>();
+
+
+            if (__instance.inTerminalMenu)
+            {
+                newTarget = 56f;
+                scavHelmet.localScale = new Vector3(0.5106f, 0.5256f, 0.5236f);
+            }
+            else if (__instance.IsInspectingItem)
+            {
+                newTarget = 46f * 0.65f;
+                scavHelmet.localScale = new Vector3(0.5106f, 0.5256f, 0.5236f);
+            }
+            else
+            {
+                newTarget = !__instance.isSprinting ? 66f * 0.65f : 68f * 0.65f;
+                scavHelmet.localScale = new Vector3(0.5906f, 0.7236f, 0.5236f);
+            }
+
+            __instance.gameplayCamera.fieldOfView = UnityEngine.Mathf.Lerp(lastActualFov, newTarget, 6.0f * UnityEngine.Time.deltaTime);
+
         }
     }
 }
